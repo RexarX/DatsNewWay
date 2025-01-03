@@ -22,6 +22,8 @@
 
 A solution for DatsNewWay gamathon 2024.
 
+![screenshot](Images/Snake3D_gQBbOmI1Bz.png)
+
 ## Getting Started
 
 ### Requirements
