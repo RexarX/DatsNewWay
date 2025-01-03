@@ -94,6 +94,6 @@ namespace Snake {
   void Server::PrintGameState() {
     CORE_INFO("Game state:\nMap size: ({}, {}, {})\nName: {}\nPoints: {}\nTurn: {}\nTick remain ms: {}\nRevive timeout: {} seconds",
               m_GameState.mapSize.x, m_GameState.mapSize.y, m_GameState.mapSize.z,
-              m_GameState.name, m_GameState.points, m_GameState.turn, m_GameState.reviveTimeoutSec, m_GameState.tickRemainMs);
+              m_GameState.name, m_GameState.points, m_GameState.turn, m_GameState.tickRemainMs, m_GameState.reviveTimeoutSec);
   }
 }

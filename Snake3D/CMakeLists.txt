@@ -197,3 +197,13 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     cpr::cpr
     raylib
 )
+
+add_custom_command(TARGET ${PROJECT_NAME}
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory 
+        "${CMAKE_CURRENT_SOURCE_DIR}/../bin/${CMAKE_BUILD_TYPE}-${BUILD_PLATFORM}-${ARCHITECTURE}/Assets"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/../Assets"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../bin/${CMAKE_BUILD_TYPE}-${BUILD_PLATFORM}-${ARCHITECTURE}/Assets"
+    COMMENT "Copying Assets to output directory"
+)

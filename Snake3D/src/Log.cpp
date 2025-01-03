@@ -50,10 +50,10 @@ namespace Snake {
     std::filesystem::create_directories("Logs");
 
     auto file_formatter = std::make_unique<spdlog::pattern_formatter>();
-    file_formatter->add_flag<star_formatter_flag>('*').set_pattern("[%T] [%l] %n: %v %*");
+    file_formatter->add_flag<star_formatter_flag>('*').set_pattern("[%T] [thread %t] [%l] %n: %v %*");
 
     auto formatter = std::make_unique<spdlog::pattern_formatter>();
-    formatter->add_flag<star_formatter_flag>('*').set_pattern("[%T] [%^%l%$] %n: %v %*");
+    formatter->add_flag<star_formatter_flag>('*').set_pattern("[%T] [thread %t] [%^%l%$] %n: %v %*");
 
     logSinks.emplace_back(
       std::make_shared<spdlog::sinks::basic_file_sink_mt>(logFilePath, true)

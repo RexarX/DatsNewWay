@@ -11,7 +11,7 @@ int main(int argc, char** argv) {
 	std::cin >> token;
 
 	if (token.empty()) {
-		CORE_ASSERT(false, "Failed to start application: no token provided!");
+		CORE_ASSERT_CRITICAL(false, "Failed to start application: no token provided!");
 		return 1;
 	}
 

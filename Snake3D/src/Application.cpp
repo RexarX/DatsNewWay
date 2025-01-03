@@ -50,7 +50,14 @@ namespace Snake {
 				//CORE_TRACE("Update loop: {}", m_UpdateDeltaTime.GetMilliseconds());
 				m_Server.Update();
 				if (m_Server.GetState() == Server::State::Connected) {
-					m_Game.Update(m_Server.GetGameState());
+					const GameState& gameState = m_Server.GetGameState();
+					if (gameState.tickRemainMs < serverTickLimitSec * 1000 / 2) {
+						CORE_WARN("Sleeping for {} ms!", gameState.tickRemainMs);
+						std::this_thread::sleep_for(std::chrono::milliseconds(gameState.tickRemainMs));
+						continue;
+					}
+
+					m_Game.Update(gameState);
 					m_Server.PrintGameState();
 				}
 

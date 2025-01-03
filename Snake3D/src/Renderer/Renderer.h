@@ -10,7 +10,7 @@ namespace Snake {
     Renderer() = default;
     Renderer(std::string_view windowName, uint32_t width, uint32_t height);
     ~Renderer() {
-      //UnloadSkybox();
+      UnloadSkybox();
       CloseWindow();
     }
 
@@ -41,6 +41,13 @@ namespace Snake {
     bool IsPointInFrustum(const Vector3& point) const noexcept;
     bool IsCubeInFrustum(const Vector3& position, float size) const noexcept;
 
+    static Image CreateCubemapImage(const char* rightPath, const char* leftPath, const char* topPath,
+                                    const char* bottomPath, const char* frontPath, const char* backPath);
+
+    static void SaveCubemapImage(const char* outputPath, const char* rightPath, const char* leftPath,
+                                 const char* topPath, const char* bottomPath, const char* frontPath,
+                                 const char* backPath);
+
   private:
     struct Plane {
       Vector3 normal{ 0, 0, 0 };
@@ -63,7 +70,6 @@ namespace Snake {
     Model m_SphereModel;
     bool m_ShowGrid = false;
 
-    Texture2D m_SkyboxTextures[6];  // Right, Left, Up, Down, Front, Back
     Mesh m_SkyboxMesh;
     Model m_SkyboxModel;
 

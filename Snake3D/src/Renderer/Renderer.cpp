@@ -17,7 +17,7 @@ namespace Snake {
     SetWindowState(FLAG_VSYNC_HINT);
 
     InitializeMeshes();
-    //InitializeSkybox();
+    InitializeSkybox();
 
     m_Camera.position = Vector3{ 50.0f, 100.0f, 0.0f };
     m_Camera.target = Vector3{ 0.0f, 0.0f, 0.0f };
@@ -43,25 +43,13 @@ namespace Snake {
 
     BeginMode3D(m_Camera);
 
-    //DrawSkybox();
+    rlEnableSmoothLines();
+
+    DrawSkybox();
 
     if (m_ShowGrid) {
       DrawSectorGrid(gameState);
       DrawSimplifiedGrid(gameState.mapSize.x + 1);
-    }
-
-    // Batch render fences
-    for (const Coords& fence : gameState.fences) {
-      Vector3 position{
-        static_cast<float>(fence.x),
-        static_cast<float>(fence.y),
-        static_cast<float>(fence.z)
-      };
-
-      if (IsCubeInFrustum(position, 1.0f)) {
-        DrawModelEx(m_CubeModel, position, { 0, 1, 0 }, 0.0f, { 1.0f, 1.0f, 1.0f }, GRAY);
-        DrawCubeWires(position, 1.0f, 1.0f, 1.0f, RED);
-      }
     }
 
     // Batch render food using instancing
@@ -81,6 +69,23 @@ namespace Snake {
 
     RenderSnakes(gameState.enemies, gameState.snakes);
 
+    rlDisableDepthMask();
+
+    // Batch render fences
+    for (const Coords& fence : gameState.fences) {
+      Vector3 position{
+        static_cast<float>(fence.x),
+        static_cast<float>(fence.y),
+        static_cast<float>(fence.z)
+      };
+
+      if (IsCubeInFrustum(position, 1.0f)) {
+        DrawModelEx(m_CubeModel, position, { 0, 1, 0 }, 0.0f, { 1.0f, 1.0f, 1.0f }, ColorAlpha(GRAY, 0.5f));
+      }
+    }
+
+    rlEnableDepthMask();
+    
     EndMode3D();
 
     DrawHUD(gameState, deltaTime);
@@ -97,39 +102,57 @@ namespace Snake {
   }
 
   void Renderer::InitializeSkybox() {
-    Image img = GenImageColor(512, 512, SKYBLUE);
-    m_SkyboxTextures[0] = LoadTextureFromImage(img);  // Right
-    m_SkyboxTextures[1] = LoadTextureFromImage(img);  // Left
+    Image cubemap = CreateCubemapImage(
+      "Assets/Textures/Skybox/right.png",
+      "Assets/Textures/Skybox/left.png",
+      "Assets/Textures/Skybox/top.png",
+      "Assets/Textures/Skybox/bottom.png",
+      "Assets/Textures/Skybox/front.png",
+      "Assets/Textures/Skybox/back.png"
+    );
 
-    Image topImg = GenImageColor(512, 512, BLUE);
-    m_SkyboxTextures[2] = LoadTextureFromImage(topImg);  // Up
-
-    Image bottomImg = GenImageColor(512, 512, DARKBLUE);
-    m_SkyboxTextures[3] = LoadTextureFromImage(bottomImg);  // Down
-
-    m_SkyboxTextures[4] = LoadTextureFromImage(img);  // Front
-    m_SkyboxTextures[5] = LoadTextureFromImage(img);  // Back
-
-    UnloadImage(img);
-    UnloadImage(topImg);
-    UnloadImage(bottomImg);
+    if (!cubemap.data) {
+      CORE_ERROR("Failed to create cubemap image!");
+      return;
+    }
 
     m_SkyboxMesh = GenMeshCube(1.0f, 1.0f, 1.0f);
     m_SkyboxModel = LoadModelFromMesh(m_SkyboxMesh);
 
-    for (uint32_t i = 0; i < 6; ++i) {
-      m_SkyboxModel.materials[0].maps[MATERIAL_MAP_CUBEMAP].texture = m_SkyboxTextures[i];
-    }
+#if defined(PLATFORM_DESKTOP)
+    const int GLSL_VERSION = 330;
+#else
+    const int GLSL_VERSION = 100;
+#endif
+
+    m_SkyboxModel.materials[0].shader = LoadShader(
+      TextFormat("Assets/Shaders/Skybox/skybox.vert", GLSL_VERSION),
+      TextFormat("Assets/Shaders/Skybox/skybox.frag", GLSL_VERSION)
+    );
+
+    int c = MATERIAL_MAP_CUBEMAP;
+    SetShaderValue(m_SkyboxModel.materials[0].shader,
+                   GetShaderLocation(m_SkyboxModel.materials[0].shader, "environmentMap"),
+                   &c,
+                   SHADER_UNIFORM_INT);
+
+    m_SkyboxModel.materials[0].maps[MATERIAL_MAP_CUBEMAP].texture = LoadTextureCubemap(cubemap, CUBEMAP_LAYOUT_AUTO_DETECT);
+
+    UnloadImage(cubemap);
   }
 
   void Renderer::DrawSkybox() {
     rlDisableBackfaceCulling();
     rlDisableDepthMask();
 
-    Matrix view = MatrixLookAt(Vector3Zero(), m_Camera.target, m_Camera.up);
-    Matrix projection = MatrixPerspective(m_Camera.fovy * DEG2RAD, static_cast<float>(GetScreenWidth()) / GetScreenHeight(), 0.1f, 1000.0f);
+    Matrix matView = GetCameraMatrix(m_Camera);
+    matView.m12 = 0;
+    matView.m13 = 0;
+    matView.m14 = 0;
 
-    DrawModel(m_SkyboxModel, Vector3Zero(), 500.0f, WHITE);
+    rlPushMatrix();
+    DrawModel(m_SkyboxModel, Vector3Zero(), 1.0f, WHITE);
+    rlPopMatrix();
 
     rlEnableBackfaceCulling();
     rlEnableDepthMask();
@@ -137,7 +160,7 @@ namespace Snake {
 
   void Renderer::DrawSimplifiedGrid(uint32_t size) {
     constexpr uint32_t gridStep = 5;
-    constexpr Color gridColor = { 40, 40, 40, 255 };
+    constexpr Color gridColor{ 40, 40, 40, 255 };
 
     for (uint32_t i = 0; i <= size; i += gridStep) {
       DrawLine3D(
@@ -155,24 +178,27 @@ namespace Snake {
   }
 
   void Renderer::DrawSectorGrid(const GameState& gameState) {
-    constexpr Color SECTOR_COLOR = { 30, 30, 30, 100 };
-    float mapSize = static_cast<float>(gameState.mapSize.x);
+    constexpr Color SECTOR_COLOR{ 30, 30, 30, 100 };
+    constexpr Color BOUNDING_BOX_COLOR{ 255, 0, 0, 200 };
+    
+    float mapSizeX = static_cast<float>(gameState.mapSize.x);
+    float mapSizeY = static_cast<float>(gameState.mapSize.y);
+    float mapSizeZ = static_cast<float>(gameState.mapSize.z);
 
-    for (float x = 0; x <= mapSize; x += SECTOR_SIZE) {
-      for (float y = 0; y <= mapSize; y += SECTOR_SIZE) {
-        for (float z = 0; z <= mapSize; z += SECTOR_SIZE) {
-          Vector3 position = { x, y, z };
+    for (float x = 0; x < mapSizeX; x += SECTOR_SIZE) {
+      for (float y = 0; y < mapSizeY; y += SECTOR_SIZE) {
+        for (float z = 0; z < mapSizeZ; z += SECTOR_SIZE) {
+          Vector3 position{ x + SECTOR_SIZE / 2.0f, y + SECTOR_SIZE / 2.0f, z + SECTOR_SIZE / 2.0f };
           if (IsCubeInFrustum(position, static_cast<float>(SECTOR_SIZE))) {
-            DrawCubeWires(position,
-              static_cast<float>(SECTOR_SIZE),
-              static_cast<float>(SECTOR_SIZE),
-              static_cast<float>(SECTOR_SIZE),
-              SECTOR_COLOR
-            );
+            DrawCubeWires(position, static_cast<float>(SECTOR_SIZE), static_cast<float>(SECTOR_SIZE), static_cast<float>(SECTOR_SIZE),
+                          SECTOR_COLOR);
           }
         }
       }
     }
+
+    Vector3 mapCenter{ mapSizeX / 2, mapSizeY / 2, mapSizeZ / 2 };
+    DrawCubeWires(mapCenter, mapSizeX, mapSizeY, mapSizeZ, BOUNDING_BOX_COLOR);
   }
 
   void Renderer::RenderSpecialFood(const SpecialFood& specialFood) {
@@ -333,10 +359,81 @@ namespace Snake {
     return true;
   }
 
-  void Renderer::UnloadSkybox() {
-    for (uint32_t i = 0; i < 6; ++i) {
-      UnloadTexture(m_SkyboxTextures[i]);
+  Image Renderer::CreateCubemapImage(const char* rightPath, const char* leftPath, const char* topPath, const char* bottomPath,
+                                     const char* frontPath, const char* backPath) {
+    Image right = LoadImage(rightPath);
+    Image left = LoadImage(leftPath);
+    Image top = LoadImage(topPath);
+    Image bottom = LoadImage(bottomPath);
+    Image front = LoadImage(frontPath);
+    Image back = LoadImage(backPath);
+
+    // Verify all images were loaded
+    if (!right.data && !left.data && !top.data && !bottom.data && !front.data && !back.data) {
+      CORE_ERROR("Failed to load one or more cubemap faces!");
+      return Image{ 0 };
     }
+
+    // Verify all images are square and the same size
+    if (right.width != right.height || right.width != left.width || right.width != top.width ||
+        right.width != bottom.width || right.width != front.width || right.width != back.width) {
+      ImageResize(&right, 1024, 1024);
+      ImageResize(&left, 1024, 1024);
+      ImageResize(&top, 1024, 1024);
+      ImageResize(&bottom, 1024, 1024);
+      ImageResize(&front, 1024, 1024);
+      ImageResize(&back, 1024, 1024);
+    }
+
+    uint32_t faceSize = right.width;
+
+    // Create image in cross layout (vertical cross)
+    // Layout:
+    //       [T]
+    //    [L][F][R][B]
+    //       [B]
+    Image cubemap = GenImageColor(faceSize * 4, faceSize * 3, BLANK);
+
+    ImageDraw(&cubemap, top, Rectangle{ 0, 0, (float)faceSize, (float)faceSize },
+      Rectangle{ (float)faceSize, 0, (float)faceSize, (float)faceSize }, WHITE);
+
+    ImageDraw(&cubemap, left, Rectangle{ 0, 0, (float)faceSize, (float)faceSize },
+      Rectangle{ 0, (float)faceSize, (float)faceSize, (float)faceSize }, WHITE);
+
+    ImageDraw(&cubemap, front, Rectangle{ 0, 0, (float)faceSize, (float)faceSize },
+      Rectangle{ (float)faceSize, (float)faceSize, (float)faceSize, (float)faceSize }, WHITE);
+
+    ImageDraw(&cubemap, right, Rectangle{ 0, 0, (float)faceSize, (float)faceSize },
+      Rectangle{ (float)faceSize * 2, (float)faceSize, (float)faceSize, (float)faceSize }, WHITE);
+
+    ImageDraw(&cubemap, back, Rectangle{ 0, 0, (float)faceSize, (float)faceSize },
+      Rectangle{ (float)faceSize * 3, (float)faceSize, (float)faceSize, (float)faceSize }, WHITE);
+
+    ImageDraw(&cubemap, bottom, Rectangle{ 0, 0, (float)faceSize, (float)faceSize },
+      Rectangle{ (float)faceSize, (float)faceSize * 2, (float)faceSize, (float)faceSize }, WHITE);
+
+    UnloadImage(right);
+    UnloadImage(left);
+    UnloadImage(top);
+    UnloadImage(bottom);
+    UnloadImage(front);
+    UnloadImage(back);
+
+    return cubemap;
+  }
+
+  void Renderer::SaveCubemapImage(const char* outputPath, const char* rightPath, const char* leftPath, const char* topPath,
+                                  const char* bottomPath, const char* frontPath, const char* backPath) {
+    Image cubemap = CreateCubemapImage(rightPath, leftPath, topPath, bottomPath, frontPath, backPath);
+    if (cubemap.data) {
+      ExportImage(cubemap, outputPath);
+      CORE_INFO("Cubemap saved successfully to: {}!", outputPath);
+      UnloadImage(cubemap);
+    }
+  }
+
+  void Renderer::UnloadSkybox() {
+    UnloadTexture(m_SkyboxModel.materials[0].maps[MATERIAL_MAP_CUBEMAP].texture);
     UnloadModel(m_SkyboxModel);
   }
 
