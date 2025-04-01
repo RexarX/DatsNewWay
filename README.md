@@ -42,9 +42,9 @@ A solution for gamathon DatsNewWay.
 2. Clone the repo
 
 ```sh
-git clone https://github.com/RexarX/Gamathon2024.git
+git clone https://github.com/RexarX/DatsNewWay.git
 git submodule update --init --recursive
-cd Gamathon2024
+cd DatsNewWay
 ```
 
 3. Build with cmake
