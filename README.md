@@ -20,7 +20,7 @@
 
 ## About The Project
 
-A solution for DatsNewWay gamathon 2024.
+A solution for gamathon DatsNewWay.
 
 ![screenshot](Images/Snake3D_gQBbOmI1Bz.png)
 
