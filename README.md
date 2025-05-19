@@ -43,8 +43,8 @@ A solution for gamathon DatsNewWay.
 
 ```sh
 git clone https://github.com/RexarX/DatsNewWay.git
-git submodule update --init --recursive
 cd DatsNewWay
+git submodule update --init --recursive
 ```
 
 3. Build with cmake
