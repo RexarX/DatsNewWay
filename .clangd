@@ -1,0 +1,38 @@
+CompileFlags:
+  Add: 
+    - "-std=c++23"
+    - "-Wall"
+    - "-Wextra"
+    # Include paths
+    - "-I."
+    - "-Isrc"
+  
+  # Remove problematic flags that CMake might add
+  Remove: ["-fno-exceptions", "-fno-rtti"]
+
+Diagnostics:
+  UnusedIncludes: Strict
+  ClangTidy:
+    Add: 
+      - modernize*
+      - performance*
+      - bugprone*
+      - readability*
+    Remove:
+      - modernize-use-trailing-return-type
+      - readability-identifier-length
+
+Index:
+  Background: Build
+  StandardLibrary: Yes
+
+InlayHints:
+  Enabled: Yes
+  ParameterNames: Yes
+  DeducedTypes: Yes
+
+Hover:
+  ShowAKA: Yes
+
+Style:
+  FullyQualifiedNamespaces: No
